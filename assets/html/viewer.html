@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>3D Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; }
+  html, body { width: 100%; height: 100%; background: #1a1a2e; overflow: hidden; }
+  canvas { touch-action: none; display: block; }
+  #viewer-container { width: 100%; height: 100%; position: relative; }
+  #loading {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff; font-family: sans-serif; font-size: 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    z-index: 10;
+  }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid rgba(255,255,255,0.2);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #controls {
+    position: absolute; top: 12px; right: 12px;
+    display: flex; flex-direction: row; gap: 6px;
+    z-index: 10;
+  }
+  .btn {
+    background: rgba(255,255,255,0.15); color: #fff;
+    border: 1px solid rgba(255,255,255,0.3); border-radius: 20px;
+    padding: 8px 16px; font-size: 12px; cursor: pointer;
+    backdrop-filter: blur(4px); -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active { background: rgba(255,255,255,0.35); }
+  #pdb-label {
+    position: absolute; top: 12px; left: 12px;
+    color: rgba(255,255,255,0.8); font-family: sans-serif;
+    font-size: 16px; font-weight: bold; z-index: 10;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  }
+  #error {
+    display: none; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ff6b6b; font-family: sans-serif; font-size: 13px;
+    text-align: center; padding: 16px; z-index: 10;
+  }
+</style>
+</head>
+<body>
+<div id="viewer-container">
+  <div id="loading">
+    <div class="spinner"></div>
+    <span>Loading structure…</span>
+  </div>
+  <div id="error"></div>
+  <div id="pdb-label"></div>
+  <div id="controls">
+    <button class="btn" ontouchend="setStyle('cartoon')" onclick="setStyle('cartoon')">Cartoon</button>
+    <button class="btn" ontouchend="setStyle('stick')" onclick="setStyle('stick')">Stick</button>
+    <button class="btn" ontouchend="setStyle('sphere')" onclick="setStyle('sphere')">Sphere</button>
+    <button class="btn" ontouchend="resetView()" onclick="resetView()">Reset</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js"
+  onerror="showError('Failed to load 3Dmol.js. Check internet connection.')">
+</script>
+<script>
+  var viewer = null;
+  var viewerReady = false;
+  var pendingPdbId = null;
+  var currentPdbId = 'PROTEIN';
+
+  function showError(msg) {
+    document.getElementById('loading').style.display = 'none';
+    var e = document.getElementById('error');
+    e.textContent = msg;
+    e.style.display = 'block';
+  }
+
+  function initViewer() {
+    try {
+      var element = document.getElementById('viewer-container');
+      var config = { backgroundColor: 0x1a1a2e, antialias: true };
+      viewer = $3Dmol.createViewer(element, config);
+      viewer.setWidth('100%');
+      viewer.setHeight('100%');
+
+      // Handle WebGL context loss (Android reclaims GPU memory under pressure)
+      var canvas = element.querySelector('canvas');
+      if (canvas) {
+        canvas.addEventListener('webglcontextlost', function(e) {
+          e.preventDefault();
+          viewerReady = false;
+        }, false);
+        canvas.addEventListener('webglcontextrestored', function() {
+          viewerReady = true;
+          if (currentPdbId) loadProtein(currentPdbId);
+        }, false);
+      }
+
+      viewerReady = true;
+      // Flush any load request that arrived before we were ready
+      if (pendingPdbId) {
+        var id = pendingPdbId;
+        pendingPdbId = null;
+        loadProtein(id);
+      }
+    } catch(e) {
+      showError('WebGL not supported: ' + e.message);
+    }
+  }
+
+  function loadProtein(pdbId) {
+    if (!viewer || !viewerReady) {
+      pendingPdbId = pdbId;
+      return;
+    }
+    currentPdbId = pdbId.toUpperCase();
+    document.getElementById('pdb-label').textContent = currentPdbId;
+    document.getElementById('loading').style.display = 'flex';
+    document.getElementById('error').style.display = 'none';
+
+    try {
+      viewer.removeAllModels();
+      viewer.removeAllSurfaces();
+      viewer.render();
+
+      $3Dmol.download('pdb:' + currentPdbId, viewer, { multimodel: false }, function() {
+        try {
+          document.getElementById('loading').style.display = 'none';
+          applyStyle('cartoon');
+          viewer.zoomTo();
+          viewer.render();
+        } catch(e) {
+          showError('Render error: ' + e.message);
+        }
+      });
+    } catch(e) {
+      showError('Load error: ' + e.message);
+    }
+  }
+
+  function applyStyle(style) {
+    if (!viewer || !viewerReady) return;
+    try {
+      viewer.setStyle({}, {});
+      if (style === 'stick') {
+        viewer.setStyle({}, { stick: { colorscheme: 'Jmol', radius: 0.15 } });
+      } else if (style === 'sphere') {
+        viewer.setStyle({}, { sphere: { colorscheme: 'Jmol', scale: 0.35 } });
+      } else {
+        viewer.setStyle({}, { cartoon: { colorscheme: 'chain' } });
+        viewer.setStyle({ ss: 'coil' }, {
+          cartoon: { colorscheme: 'chain' },
+          line: { colorscheme: 'chain', linewidth: 1.5 }
+        });
+      }
+      viewer.render();
+    } catch(e) { console.error('Style error:', e); }
+  }
+
+  function setStyle(style) { applyStyle(style); }
+
+  function resetView() {
+    if (!viewer || !viewerReady) return;
+    try { viewer.zoomTo(); viewer.render(); } catch(e) {}
+  }
+
+  // Called from Flutter — queues the load if viewer isn't ready yet
+  function flutterLoadProtein(pdbId) {
+    if (!viewerReady) {
+      pendingPdbId = pdbId;
+    } else {
+      loadProtein(pdbId);
+    }
+  }
+
+  // Receive messages from Flutter web (iframe postMessage bridge).
+  // Format: 'pdb:XXXX'
+  window.addEventListener('message', function(event) {
+    if (typeof event.data === 'string' && event.data.startsWith('pdb:')) {
+      flutterLoadProtein(event.data.slice(4));
+    }
+  });
+
+  window.addEventListener('load', function() {
+    if (typeof $3Dmol === 'undefined') {
+      showError('3Dmol.js failed to load.\nCheck internet connection.');
+      return;
+    }
+
+    // Honour URL query param ?pdb=XXXX when embedded as an iframe from Flutter web.
+    var urlPdbId = new URLSearchParams(window.location.search).get('pdb');
+    if (urlPdbId && !pendingPdbId) {
+      pendingPdbId = urlPdbId.toUpperCase();
+    }
+
+    initViewer();
+
+    // If initViewer didn't flush a queued protein, fall back to default.
+    if (currentPdbId === 'PROTEIN') loadProtein('1TUP');
+  });
+</script>
+</body>
+</html>

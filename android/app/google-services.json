@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "599668381855",
+    "project_id": "projet-ds-ang",
+    "storage_bucket": "projet-ds-ang.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:599668381855:android:6199e0ebdb50a613276aaa",
+        "android_client_info": {
+          "package_name": "com.biolab.protein3d_viewer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBj2iNf3gVJEA1NM1j6Q_95erMri78u_-A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:599668381855:android:db01157514a752e0276aaa",
+        "android_client_info": {
+          "package_name": "com.example.projet"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBj2iNf3gVJEA1NM1j6Q_95erMri78u_-A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
